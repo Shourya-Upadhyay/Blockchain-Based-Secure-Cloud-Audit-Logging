@@ -1,0 +1,25 @@
+{
+  "name": "blockchain-secure-cloud-audit-logging",
+  "version": "1.0.0",
+  "description": "B.Tech CSE Major Project: Blockchain-Based Secure Cloud Audit Logging using Flask, SQLite, and Ganache",
+  "main": "app.py",
+  "scripts": {
+    "start": "python app.py",
+    "test": "pytest tests/"
+  },
+  "keywords": [
+    "blockchain",
+    "cloud-audit",
+    "ethereum",
+    "ganache",
+    "solidity",
+    "flask",
+    "integrity-verification"
+  ],
+  "author": "Shourya Upadhyay & Jeevesh Pachauri",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.0"
+  }
+}
