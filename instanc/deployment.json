@@ -1,0 +1,11 @@
+{
+  "contract_name": "AuditLogContract",
+  "contract_address": "0x50e9E8485DF4A8A17C066d90165B37e5E9Cfe99B",
+  "transaction_hash": "0xb3b6e74cf36285f8985b64acfb0bb12d82bb2c11e04a2ff002620def581596be",
+  "block_number": 2,
+  "deployer_address": "0xA0CCB06f4b3364867e638280d54dE49CD9548101",
+  "chain_id": 1337,
+  "rpc_url": "http://127.0.0.1:7545",
+  "deployed_at": "2026-10-29T20:14:31.249435+00:00",
+  "solc_version": "0.8.20"
+}
