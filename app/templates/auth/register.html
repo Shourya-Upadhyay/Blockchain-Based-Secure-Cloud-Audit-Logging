@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Register Account — CloudAuditChain Security Console{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+    <div class="col-md-7 col-lg-5 col-xl-4">
+        <div class="soc-card p-4 p-md-5" style="border-top: 3px solid var(--accent-indigo);">
+            <div class="text-center mb-4">
+                <div class="brand-icon-box mx-auto mb-3" style="width: 52px; height: 52px; font-size: 1.6rem; border-radius: var(--radius-md); background: linear-gradient(135deg, #4F46E5 0%, #2563EB 100%);">
+                    <i class="bi bi-person-plus-fill"></i>
+                </div>
+                <h1 class="h4 fw-bold text-dark mb-1">Create Account</h1>
+                <p class="small text-secondary mb-0">Provision an authenticated cloud user account</p>
+            </div>
+
+            <form method="POST" action="{{ url_for('auth.register') }}" id="register-form" onsubmit="handleFormSubmitLoading(this, 'Registering Account...');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="mb-3">
+                    <label for="username" class="form-label-custom">
+                        <span>Username</span>
+                        <span class="text-muted small" style="font-size: 0.7rem;">3-30 characters</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border text-secondary">
+                            <i class="bi bi-person"></i>
+                        </span>
+                        <input type="text" class="form-control form-control-custom" id="username" name="username" value="{{ username or '' }}" required autofocus autocomplete="username" placeholder="Choose a username">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="reg-password" class="form-label-custom">
+                        <span>Password</span>
+                        <span id="pwd-strength-label" class="text-muted small" style="font-size: 0.7rem;">Minimum 8 chars</span>
+                    </label>
+                    <div class="input-group password-toggle-group">
+                        <span class="input-group-text bg-light border text-secondary">
+                            <i class="bi bi-shield-lock"></i>
+                        </span>
+                        <input type="password" class="form-control form-control-custom" id="reg-password" name="password" required autocomplete="new-password" placeholder="At least 8 chars with digit/symbol">
+                        <button class="password-toggle-btn" type="button" data-target="reg-password" aria-label="Show password" title="Toggle password visibility">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
+                    <!-- Real-Time Password Strength Meter -->
+                    <div class="password-strength-bar">
+                        <div class="strength-segment"></div>
+                        <div class="strength-segment"></div>
+                        <div class="strength-segment"></div>
+                        <div class="strength-segment"></div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="confirm_password" class="form-label-custom">
+                        <span>Confirm Password</span>
+                    </label>
+                    <div class="input-group password-toggle-group">
+                        <span class="input-group-text bg-light border text-secondary">
+                            <i class="bi bi-check2-circle"></i>
+                        </span>
+                        <input type="password" class="form-control form-control-custom" id="confirm_password" name="confirm_password" required autocomplete="new-password" placeholder="Re-enter password">
+                        <button class="password-toggle-btn" type="button" data-target="confirm_password" aria-label="Show password" title="Toggle password visibility">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded bg-light border text-secondary small mb-3" style="font-size: 0.75rem;">
+                    <i class="bi bi-info-circle text-primary me-1"></i> Public registration assigns standard User permissions. Auditor privileges require administrative provisioning.
+                </div>
+
+                <button type="submit" class="btn btn-primary-custom w-100 mb-3 justify-content-center" id="btn-register-submit">
+                    <i class="bi bi-check-circle-fill me-1"></i> Register Account
+                </button>
+            </form>
+
+            <div class="text-center pt-3 border-top border-light-subtle">
+                <span class="text-secondary small">Already registered?</span>
+                <a href="{{ url_for('auth.login') }}" class="small fw-semibold ms-1 text-primary text-decoration-none">Sign in here</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

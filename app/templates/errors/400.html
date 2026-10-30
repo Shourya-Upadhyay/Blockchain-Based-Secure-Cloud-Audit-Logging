@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}400 - Bad Request | CloudAuditChain{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-8 col-lg-6 text-center">
+        <div class="glass-card p-5">
+            <div class="display-1 fw-bold text-amber mb-3" style="color: var(--accent-amber);">400</div>
+            <h2 class="fw-bold text-dark mb-3">Bad Request</h2>
+            <p class="text-secondary mb-4">
+                {{ error.description if error and error.description and error.description != '400 Bad Request: The browser (or proxy) sent a request that this server could not understand.' else 'The server could not understand the request due to invalid syntax or parameters.' }}
+            </p>
+            <a href="{{ url_for('index') }}" class="btn btn-primary-custom d-inline-flex align-items-center gap-2">
+                <i class="bi bi-house-door-fill"></i> Return to Overview
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

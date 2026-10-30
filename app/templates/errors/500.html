@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}500 - Internal Server Error | CloudAuditChain{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-8 col-lg-6 text-center">
+        <div class="glass-card p-5">
+            <div class="display-1 fw-bold text-rose mb-3" style="color: var(--accent-rose);">500</div>
+            <h2 class="fw-bold text-dark mb-3">Internal Server Error</h2>
+            <p class="text-secondary mb-4">
+                The server encountered an unexpected condition. Any uncommitted database operations have been rolled back.
+            </p>
+            <a href="{{ url_for('index') }}" class="btn btn-primary-custom d-inline-flex align-items-center gap-2">
+                <i class="bi bi-house-door-fill"></i> Return to Overview
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

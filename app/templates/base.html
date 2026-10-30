@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CloudAuditChain — Enterprise Blockchain Cloud Audit Platform{% endblock %}</title>
+    <meta name="description" content="Cybersecurity SOC Platform: Blockchain-Based Secure Cloud Audit Logging with dual-layer off-chain SQLite and immutable on-chain Ganache Ethereum anchoring.">
+    
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <!-- Production-Grade SOC Design System (Light Theme) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Top Command Shell Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-custom" id="main-navbar">
+        <div class="container-fluid px-lg-4">
+            <!-- Brand Emblem & Workspace Indicator -->
+            <a class="navbar-brand" href="{{ url_for('index') }}" id="nav-brand-logo">
+                <div class="brand-icon-box">
+                    <i class="bi bi-shield-lock-fill"></i>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fw-bold tracking-tight">CloudAudit<span style="color: var(--accent-blue);">Chain</span></span>
+                    <span class="brand-badge d-none d-sm-inline">Enterprise SOC</span>
+                </div>
+            </a>
+            
+            <button class="navbar-toggler border-0 shadow-none text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                <i class="bi bi-list fs-2 text-dark"></i>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <!-- Navigation Tabs -->
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3 gap-1">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}" id="nav-link-home">
+                            <i class="bi bi-grid-1x2"></i>
+                            <span>Overview</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('cloud.') %}active{% endif %}" href="{{ url_for('cloud.files') }}" id="nav-link-cloud">
+                            <i class="bi bi-folder2-open"></i>
+                            <span>Cloud Storage</span>
+                        </a>
+                    </li>
+                    {% if current_user and current_user.is_auditor %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('audit.') %}active{% endif %}" href="{{ url_for('audit.dashboard') }}" id="nav-link-auditor">
+                            <i class="bi bi-shield-check"></i>
+                            <span>Auditor Console</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'health_check' %}active{% endif %}" href="{{ url_for('health_check') }}" target="_blank" id="nav-link-health">
+                            <i class="bi bi-activity"></i>
+                            <span>Diagnostics API</span>
+                        </a>
+                    </li>
+                </ul>
+                
+                <!-- Right Action Cluster: Node Telemetry & User Menu -->
+                <div class="d-flex align-items-center gap-3">
+                    <!-- Real-Time EVM Node Telemetry Badge -->
+                    <div id="navbar-health-badge" class="node-telemetry-pill d-none d-sm-inline-flex" title="System Node Health">
+                        <span class="status-dot pending"></span>
+                        <span>Checking Node...</span>
+                    </div>
+
+                    {% if current_user %}
+                        <div class="dropdown">
+                            <div class="user-identity-chip dropdown-toggle" id="user-menu-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                                <div class="user-avatar-circle">
+                                    {{ current_user.username[:1].upper() }}
+                                </div>
+                                <span class="fw-medium text-dark small">{{ current_user.username }}</span>
+                                {% if current_user.is_auditor %}
+                                    <span class="badge ms-1" style="font-size: 0.65rem; background: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE;">AUDITOR</span>
+                                {% else %}
+                                    <span class="badge ms-1" style="font-size: 0.65rem; background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0;">USER</span>
+                                {% endif %}
+                            </div>
+                            <ul class="dropdown-menu dropdown-menu-end p-2 shadow" aria-labelledby="user-menu-btn" style="min-width: 220px;">
+                                <li class="px-3 py-2 border-bottom border-light-subtle mb-1">
+                                    <div class="text-muted small">Signed in as</div>
+                                    <div class="fw-semibold text-dark text-truncate">{{ current_user.username }}</div>
+                                    <div class="small text-secondary">{{ 'Security Auditor' if current_user.is_auditor else 'Standard User' }}</div>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item rounded-2 py-2" href="{{ url_for('auth.profile') }}" id="nav-user-profile">
+                                        <i class="bi bi-person-badge me-2 text-primary"></i>Security Profile
+                                    </a>
+                                </li>
+                                {% if current_user.is_auditor %}
+                                    <li>
+                                        <a class="dropdown-item rounded-2 py-2" href="{{ url_for('audit.dashboard') }}" id="nav-auditor-dashboard">
+                                            <i class="bi bi-shield-shaded me-2 text-primary"></i>Auditor Verification
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item rounded-2 py-2" href="{{ url_for('auth.auditor_only_test') }}" id="nav-auditor-test">
+                                            <i class="bi bi-shield-check me-2 text-primary"></i>RBAC Verification Check
+                                        </a>
+                                    </li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider my-1"></li>
+                                <li>
+                                    <form method="POST" action="{{ url_for('auth.logout') }}" class="m-0">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="dropdown-item rounded-2 py-2 text-danger border-0 bg-transparent w-100 text-start" id="nav-user-logout">
+                                            <i class="bi bi-box-arrow-right me-2 text-danger"></i>Sign Out
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="{{ url_for('auth.login') }}" class="btn btn-outline-custom btn-sm" id="nav-btn-login">
+                                <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+                            </a>
+                            <a href="{{ url_for('auth.register') }}" class="btn btn-primary-custom btn-sm" id="nav-btn-register">
+                                Register
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Global Floating Toast Container -->
+    <div id="soc-toast-container" class="soc-toast-container"></div>
+
+    <!-- Main Content Shell -->
+    <main class="container-fluid px-lg-4 my-4 flex-grow-1" id="main-content-area">
+        <!-- Global Flash Alerts -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages-container mb-4" id="flash-alerts-wrapper">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show border d-flex align-items-center justify-content-between mb-2 shadow-sm" role="alert">
+                            <div class="d-flex align-items-center gap-2">
+                                {% if category == 'success' %}
+                                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                {% elif category in ['danger', 'error'] %}
+                                    <i class="bi bi-exclamation-octagon-fill text-danger fs-5"></i>
+                                {% elif category == 'warning' %}
+                                    <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                                {% else %}
+                                    <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+                                {% endif %}
+                                <div class="small fw-medium">{{ message }}</div>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Global Enterprise Footer -->
+    <footer class="soc-footer">
+        <div class="container-fluid px-lg-4">
+            <div class="row align-items-center gy-3">
+                <div class="col-md-6 text-center text-md-start">
+                    <div class="d-flex align-items-center justify-content-center justify-content-md-start gap-2 mb-1">
+                        <span class="badge bg-light border text-secondary font-mono" style="font-size: 0.72rem;">DUAL-LAYER EVM</span>
+                        <span class="fw-semibold text-dark">CloudAuditChain Security Platform</span>
+                    </div>
+                    <div class="small text-muted">B.Tech CSE Major Project (2026–2027) &bull; IILM University, Greater Noida</div>
+                </div>
+                <div class="col-md-6 text-center text-md-end">
+                    <div class="small">Engineered by <span class="text-dark fw-medium">Shourya Upadhyay</span> (2410031159) & <span class="text-dark fw-medium">Jeevesh Pachauri</span> (2410031186)</div>
+                    <div class="small text-muted">Academic Supervisor: Prof. Dr. Leena Arya</div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5.3 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    
+    <!-- Custom Application JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

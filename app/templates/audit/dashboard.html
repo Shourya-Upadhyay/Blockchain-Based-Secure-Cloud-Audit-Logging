@@ -1,0 +1,829 @@
+{% extends "base.html" %}
+
+{% block title %}Auditor Verification Dashboard — CloudAuditChain{% endblock %}
+
+{% block content %}
+<!-- Security Operations Command Console Header -->
+<div class="row g-3 mb-4 align-items-center">
+    <div class="col-lg-7">
+        <div class="d-inline-flex align-items-center gap-2 px-3 py-1 mb-2 rounded-pill"
+            style="background: #FFFBEB; border: 1px solid #FDE68A;">
+            <i class="bi bi-shield-shaded" style="color: #B45309;"></i>
+            <span class="small fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.04em; color: #B45309;">AUDITOR
+                RESTRICTED CONSOLE</span>
+        </div>
+        <h1 class="h3 fw-bold text-dark mb-1">Auditor Verification Dashboard</h1>
+        <p class="text-secondary small mb-0">
+            Cross-layer consensus verification comparing off-chain SQLite database records with immutable on-chain smart
+            contract hashes.
+        </p>
+    </div>
+    <div class="col-lg-5 text-lg-end d-flex gap-2 justify-content-lg-end flex-wrap">
+        <form method="POST" action="{{ url_for('audit.run_verification') }}" class="d-inline" id="verify-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-teal-custom" id="btn-verify-audit">
+                <i class="bi bi-shield-check"></i> Verify Audit Logs
+            </button>
+        </form>
+
+        <form method="POST" action="{{ url_for('audit.retry_pending') }}" class="d-inline"
+            onsubmit="handleFormSubmitLoading(this, 'Retrying Queue...');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-custom" id="btn-retry-pending"
+                title="Submit pending records to blockchain">
+                <i class="bi bi-arrow-repeat text-primary"></i> Retry Pending
+            </button>
+        </form>
+
+        {% if config.ALLOW_TAMPER_SIMULATION %}
+        <form method="POST" action="{{ url_for('audit.tamper_seed_scenarios') }}" class="d-inline"
+            onsubmit="return confirm('Seed 8 testing scenarios in database? This will insert demo records.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-danger" id="btn-seed-tamper"
+                title="Seed 8 verification demo states (Dev Only)">
+                <i class="bi bi-radioactive"></i> Seed Demo
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Forensics KPI Matrix Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="kpi-card" style="--kpi-accent: var(--accent-blue); --kpi-icon-bg: #EFF6FF;">
+            <div class="kpi-header">
+                <span class="kpi-label">Total Logs</span>
+                <div class="kpi-icon"><i class="bi bi-journal-text"></i></div>
+            </div>
+            <div class="kpi-value text-dark" id="stat-total-events">{{ stats.total_events }}</div>
+            <div class="kpi-meta text-muted">
+                <i class="bi bi-database text-primary"></i> Off-chain SQL ledger
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="kpi-card" style="--kpi-accent: var(--status-verified); --kpi-icon-bg: #ECFDF5;">
+            <div class="kpi-header">
+                <span class="kpi-label">Anchored</span>
+                <div class="kpi-icon"><i class="bi bi-shield-fill-check"></i></div>
+            </div>
+            <div class="kpi-value text-success" id="stat-anchored-count">{{ stats.anchored_count }}</div>
+            <div class="kpi-meta text-muted">
+                <i class="bi bi-link-45deg text-success"></i> Confirmed on Ganache
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="kpi-card" style="--kpi-accent: var(--status-pending); --kpi-icon-bg: #FFFBEB;">
+            <div class="kpi-header">
+                <span class="kpi-label">Pending Queue</span>
+                <div class="kpi-icon"><i class="bi bi-hourglass-split"></i></div>
+            </div>
+            <div class="kpi-value text-warning" id="stat-pending-count">{{ stats.pending_count }}</div>
+            <div class="kpi-meta text-muted">
+                <i class="bi bi-clock-history text-warning"></i> Awaiting mining
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="kpi-card" style="--kpi-accent: var(--accent-indigo); --kpi-icon-bg: #EEF2FF;">
+            <div class="kpi-header">
+                <span class="kpi-label">Blockchain Node</span>
+                {% if blockchain_status.connected %}
+                <span class="badge-custom badge-verified"
+                    style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">ONLINE</span>
+                {% else %}
+                <span class="badge-custom badge-tampered"
+                    style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">OFFLINE</span>
+                {% endif %}
+            </div>
+            {% if blockchain_status.connected %}
+            <div class="kpi-value text-dark" style="font-size: 1.4rem;">Block #{{ blockchain_status.block_number }}
+            </div>
+            <div class="kpi-meta text-muted text-truncate" title="{{ blockchain_status.contract_address }}">
+                Contract: <span class="font-mono text-secondary">{{ blockchain_status.contract_address[:8] }}...{{
+                    blockchain_status.contract_address[-6:] }}</span>
+            </div>
+            {% else %}
+            <div class="kpi-value text-secondary" style="font-size: 1.4rem;">Offline</div>
+            <div class="kpi-meta text-muted">RPC: {{ blockchain_status.rpc_url }}</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Dynamic Verification Feedback Slot -->
+<div id="verification-feedback-alert"></div>
+
+<!-- Latest Verification Report Panel (Rendered when report exists) -->
+<div id="verification-panel-slot">
+    {% if verification_report %}
+    <div class="soc-card mb-4 border-warning" id="verification-results-panel">
+        <div class="soc-card-header">
+            <div>
+                <h2 class="h5 soc-card-title">
+                    <i class="bi bi-cpu-fill text-primary"></i>
+                    <span>Cryptographic Verification Report</span>
+                </h2>
+                <span class="text-secondary small">Generated: {{ verification_report.timestamp }}</span>
+            </div>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <span class="badge-custom badge-verified">
+                    <i class="bi bi-check-circle-fill"></i> {{ verification_report.summary.verified }} Verified
+                </span>
+                {% if verification_report.summary.tampered > 0 %}
+                <span class="badge-custom badge-tampered">
+                    <i class="bi bi-exclamation-triangle-fill"></i> {{ verification_report.summary.tampered }} Tampered
+                </span>
+                {% endif %}
+                {% if verification_report.summary.missing_sql > 0 %}
+                <span class="badge-custom badge-missing">
+                    <i class="bi bi-trash3-fill"></i> {{ verification_report.summary.missing_sql }} Missing SQL
+                </span>
+                {% endif %}
+                {% if verification_report.summary.unanchored > 0 %}
+                <span class="badge-custom badge-unanchored">
+                    <i class="bi bi-clock-history"></i> {{ verification_report.summary.unanchored }} Unanchored
+                </span>
+                {% endif %}
+                {% if verification_report.summary.blockchain_unavailable > 0 %}
+                <span class="badge-custom badge-unavailable">
+                    <i class="bi bi-wifi-off"></i> {{ verification_report.summary.blockchain_unavailable }} Offline
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="p-4">
+            {% if verification_report.blockchain_status == 'OFFLINE' %}
+            <div
+                class="p-3 rounded bg-light border text-secondary small d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-info-circle-fill fs-5 text-primary"></i>
+                <div>
+                    <strong>Notice:</strong> The local Ganache blockchain node is currently offline. Verification
+                    against smart contract trust anchors was paused and classified as
+                    <strong>BLOCKCHAIN_UNAVAILABLE</strong>.
+                </div>
+            </div>
+            {% elif verification_report.summary.tampered > 0 or verification_report.summary.missing_sql > 0 %}
+            <div
+                class="p-3 rounded bg-danger bg-opacity-10 border border-danger text-danger small d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-exclamation-octagon-fill fs-4"></i>
+                <div>
+                    <strong>Tamper Alert:</strong> Discrepancies detected! Off-chain data modification or record
+                    deletion was caught by cryptographic verification against the blockchain.
+                </div>
+            </div>
+            {% else %}
+            <div
+                class="p-3 rounded bg-success bg-opacity-10 border border-success text-success small d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-shield-check fs-5"></i>
+                <div>
+                    <strong>Consensus Intact:</strong> All verified off-chain records match their immutable on-chain
+                    SHA-256 hashes perfectly.
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Verification Detail Table -->
+            <div class="table-responsive">
+                <table class="table-custom mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>Log ID</th>
+                            <th>Actor</th>
+                            <th>Action</th>
+                            <th>Status</th>
+                            <th>Recalculated SHA-256 (Off-Chain)</th>
+                            <th>Anchored SHA-256 (Blockchain)</th>
+                            <th class="text-end">Diagnostics</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in verification_report.records[:10] %}
+                        <tr
+                            class="{% if item.verification_status == 'TAMPERED' %}table-danger bg-danger bg-opacity-10{% elif item.verification_status == 'MISSING_SQL' %}table-warning bg-warning bg-opacity-10{% endif %}">
+                            <td class="font-mono text-dark fw-semibold">{{ item.log_id }}</td>
+                            <td class="text-secondary">{{ item.user_id }}</td>
+                            <td>
+                                <span class="badge-action-type badge-action-{{ item.action_type }}">{{ item.action_type }}</span>
+                            </td>
+                            <td>
+                                {% if item.verification_status == 'VERIFIED' %}
+                                <span class="badge-custom badge-verified"><i class="bi bi-check-circle"></i>
+                                    VERIFIED</span>
+                                {% elif item.verification_status == 'TAMPERED' %}
+                                <span class="badge-custom badge-tampered"><i class="bi bi-x-circle-fill"></i>
+                                    TAMPERED</span>
+                                {% elif item.verification_status == 'MISSING_SQL' %}
+                                <span class="badge-custom badge-missing"><i class="bi bi-trash3-fill"></i> MISSING
+                                    SQL</span>
+                                {% elif item.verification_status == 'UNANCHORED' %}
+                                <span class="badge-custom badge-unanchored"><i class="bi bi-hourglass-split"></i>
+                                    UNANCHORED</span>
+                                {% else %}
+                                <span class="badge-custom badge-unavailable"><i class="bi bi-wifi-off"></i>
+                                    OFFLINE</span>
+                                {% endif %}
+                            </td>
+                            <td class="font-mono small">
+                                {% if item.recalculated_hash %}
+                                <span class="text-secondary fw-medium" title="{{ item.recalculated_hash }}">{{
+                                    item.recalculated_hash[:10] }}...{{ item.recalculated_hash[-6:] }}</span>
+                                {% else %}
+                                <span class="text-danger fw-bold">None (Deleted)</span>
+                                {% endif %}
+                            </td>
+                            <td class="font-mono small">
+                                {% if item.on_chain_hash and item.on_chain_hash != 'UNKNOWN' %}
+                                <span class="text-secondary fw-medium" title="{{ item.on_chain_hash }}">{{
+                                    item.on_chain_hash[:10] }}...{{ item.on_chain_hash[-6:] }}</span>
+                                {% else %}
+                                <span class="text-muted">Not on-chain</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <button class="btn btn-outline-custom btn-sm py-0 px-2" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#diag-{{ loop.index }}"
+                                    aria-expanded="false" title="Expand Diagnostics">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="collapse" id="diag-{{ loop.index }}">
+                            <td colspan="7" class="bg-light p-3">
+                                <div class="small">
+                                    <div class="text-dark mb-1 fw-bold"><i class="bi bi-info-circle me-1 text-primary"></i>Diagnostic
+                                        Detail:</div>
+                                    <div class="text-secondary mb-2 font-mono">{{ item.details }}</div>
+                                    {% if item.recalculated_hash and item.on_chain_hash %}
+                                    <div class="row g-2 font-mono small">
+                                        <div class="col-md-6">
+                                            <span class="text-muted d-block font-sans">Recalculated Off-Chain Hash:</span>
+                                            <code class="text-secondary">{{ item.recalculated_hash }}</code>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <span class="text-muted d-block font-sans">Immutable On-Chain Hash:</span>
+                                            <code class="text-secondary">{{ item.on_chain_hash }}</code>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Search & Forensic Filters Toolbar -->
+<div class="soc-card mb-4 p-3">
+    <form method="GET" action="{{ url_for('audit.dashboard') }}" class="row g-2 align-items-center">
+        <div class="col-md-3">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light border text-secondary"><i
+                        class="bi bi-search"></i></span>
+                <input type="text" name="search" class="form-control form-control-sm form-control-custom"
+                    placeholder="Search LogID, User, File..." value="{{ current_search }}">
+            </div>
+        </div>
+        <div class="col-6 col-md-2">
+            <select name="user" class="form-select form-select-sm form-select-custom">
+                <option value="">All Users</option>
+                {% for u in all_users %}
+                <option value="{{ u }}" {% if current_user_filter==u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <select name="action" class="form-select form-select-sm form-select-custom">
+                <option value="">All Actions</option>
+                {% for act in supported_actions %}
+                <option value="{{ act }}" {% if current_action_filter==act %}selected{% endif %}>{{ act }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <select name="status" class="form-select form-select-sm form-select-custom">
+                <option value="">All Statuses</option>
+                <option value="ANCHORED" {% if current_status_filter=='ANCHORED' %}selected{% endif %}>ANCHORED</option>
+                <option value="PENDING" {% if current_status_filter=='PENDING' %}selected{% endif %}>PENDING</option>
+                <option value="FAILED" {% if current_status_filter=='FAILED' %}selected{% endif %}>FAILED</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-outline-custom btn-sm flex-fill" id="btn-filter-apply">
+                <i class="bi bi-funnel me-1"></i>Filter
+            </button>
+            <a href="{{ url_for('audit.dashboard') }}" class="btn btn-outline-custom btn-sm" id="btn-filter-reset">
+                Reset
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Main Forensic Audit Log Table -->
+<div class="soc-card mb-4 overflow-hidden">
+    <div class="soc-card-header">
+        <div>
+            <h2 class="h5 soc-card-title">
+                <i class="bi bi-shield-check text-primary"></i>
+                <span>Canonical Audit Ledger</span>
+            </h2>
+            <span class="text-muted small">Immutable sequence of authenticated operational records</span>
+        </div>
+        <span class="badge bg-light border text-secondary font-mono" style="font-size: 0.72rem;">PAGE {{
+            pagination.page }} OF {{ pagination.pages or 1 }}</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table-custom mb-0 align-middle">
+            <thead>
+                <tr>
+                    <th>Log ID</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Target Resource</th>
+                    <th>Timestamp (UTC)</th>
+                    <th>Anchoring Status</th>
+                    <th>Blockchain Reference</th>
+                    <th>Block</th>
+                    <th class="pe-4 text-end">Inspect</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if audit_logs %}
+                {% for log in audit_logs %}
+                <tr>
+                    <td>
+                        <div class="d-inline-flex align-items-center gap-1 font-mono text-dark fw-semibold">
+                            <span>{{ log.log_id }}</span>
+                            <button type="button" class="btn-icon-copy"
+                                onclick="copyToClipboard('{{ log.log_id }}', this, 'Log ID')" title="Copy Log ID">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-dark fw-medium">{{ log.user_id }}</span>
+                    </td>
+                    <td>
+                        <span class="badge-action-type badge-action-{{ log.action_type }}">{{ log.action_type }}</span>
+                    </td>
+                    <td>
+                        <span class="text-secondary font-mono small text-truncate d-inline-block" style="max-width: 180px;"
+                            title="{{ log.file_name }}">
+                            {{ log.file_name }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="audit-timestamp">{{ log.timestamp }}</span>
+                    </td>
+                    <td>
+                        {% if log.anchored_status == 'ANCHORED' %}
+                        <span class="badge-custom badge-verified"><i class="bi bi-shield-fill-check"></i>
+                            ANCHORED</span>
+                        {% elif log.anchored_status == 'PENDING' %}
+                        <span class="badge-custom badge-pending"><i class="bi bi-clock"></i> PENDING</span>
+                        {% else %}
+                        <span class="badge-custom badge-tampered"><i class="bi bi-x-circle"></i> FAILED</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.tx_hash %}
+                        <div class="d-inline-flex align-items-center gap-1">
+                            <span class="badge-tx-hash" title="{{ log.tx_hash }}">
+                                {{ log.tx_hash[:10] }}...{{ log.tx_hash[-6:] }}
+                            </span>
+                            <button type="button" class="btn-icon-copy"
+                                onclick="copyToClipboard('{{ log.tx_hash }}', this, 'Transaction Hash')"
+                                title="Copy Full Transaction Hash">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        </div>
+                        {% else %}
+                        <span class="text-muted font-mono small">Pending on-chain</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if log.block_number is not none %}
+                        <span class="badge-block-num" title="Mined in Block #{{ log.block_number }}">
+                            #{{ log.block_number }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted font-mono small">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="pe-4 text-end">
+                        <button type="button" class="btn btn-outline-custom btn-sm py-1 px-2" data-bs-toggle="modal"
+                            data-bs-target="#inspectModal-{{ log.id }}" title="Inspect Canonical Record">
+                            <i class="bi bi-eye text-primary"></i>
+                        </button>
+
+                        {% if config.ALLOW_TAMPER_SIMULATION %}
+                        <form method="POST" action="{{ url_for('audit.tamper_modify_record', log_id=log.id) }}"
+                            class="d-inline"
+                            onsubmit="return confirm('Simulate insider tampering: Modify record {{ log.log_id }} in SQLite?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-warning btn-sm py-1 px-2"
+                                title="[DEV] Modify off-chain field without re-hashing">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('audit.tamper_delete_record', log_id=log.id) }}"
+                            class="d-inline"
+                            onsubmit="return confirm('Simulate record destruction: Delete {{ log.log_id }} from SQLite?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm py-1 px-2"
+                                title="[DEV] Delete row from SQLite directly">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="9" class="p-5 text-center text-muted">
+                        <i class="bi bi-journal-x fs-1 mb-2 d-block text-secondary"></i>
+                        <div class="fw-semibold text-dark">No audit records match the current filters</div>
+                        <div class="small">Try resetting your search query or filter parameters.</div>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    {% if pagination.pages and pagination.pages > 1 %}
+    <div class="p-3 border-top border-light-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="small text-muted">
+            Showing page {{ pagination.page }} of {{ pagination.pages or 1 }} (records {{ (pagination.page - 1) *
+            pagination.per_page + 1 }} - {{ [pagination.page * pagination.per_page, pagination.total]|min }} of {{
+            pagination.total }})
+        </span>
+        <nav aria-label="Audit table pagination">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link"
+                        href="{{ url_for('audit.dashboard', page=pagination.prev_num, user=current_user_filter, action=current_action_filter, status=current_status_filter, search=current_search) if pagination.has_prev else '#' }}">
+                        &laquo; Prev
+                    </a>
+                </li>
+                {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link"
+                        href="{{ url_for('audit.dashboard', page=p, user=current_user_filter, action=current_action_filter, status=current_status_filter, search=current_search) }}">
+                        {{ p }}
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                {% endif %}
+                {% endfor %}
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link"
+                        href="{{ url_for('audit.dashboard', page=pagination.next_num, user=current_user_filter, action=current_action_filter, status=current_status_filter, search=current_search) if pagination.has_next else '#' }}">
+                        Next &raquo;
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Inspect Modals for Audit Logs -->
+{% for log in audit_logs %}
+<div class="modal fade" id="inspectModal-{{ log.id }}" tabindex="-1" aria-labelledby="inspectModalLabel-{{ log.id }}"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modal-content-custom">
+            <div class="modal-header modal-header-custom">
+                <h5 class="modal-title fw-semibold text-dark d-flex align-items-center gap-2"
+                    id="inspectModalLabel-{{ log.id }}">
+                    <i class="bi bi-shield-check text-primary"></i>
+                    <span>Forensic Inspection &bull; {{ log.log_id }}</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="p-2 rounded bg-light border">
+                            <span class="text-muted small d-block font-sans">User / Actor:</span>
+                            <span class="fw-semibold text-dark font-mono">{{ log.user_id }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-2 rounded bg-light border">
+                            <span class="text-muted small d-block font-sans">Action Type:</span>
+                            <span class="badge-action-type badge-action-{{ log.action_type }}">{{ log.action_type
+                                }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-2 rounded bg-light border">
+                            <span class="text-muted small d-block font-sans">Target Resource:</span>
+                            <span class="text-dark font-mono fw-medium">{{ log.file_name }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-2 rounded bg-light border">
+                            <span class="text-muted small d-block font-sans">Timestamp (UTC):</span>
+                            <span class="text-secondary font-mono">{{ log.timestamp }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Canonical Digest Hash -->
+                <div class="p-3 rounded bg-light border mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-muted small font-sans">SHA-256 Canonical Audit Hash:</span>
+                        <button type="button" class="btn-icon-copy"
+                            onclick="copyToClipboard('{{ log.log_hash }}', this, 'SHA-256 Hash')" title="Copy Hash">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                    <code class="text-secondary font-mono d-block text-break"
+                        style="font-size: 0.85rem;">{{ log.log_hash }}</code>
+                </div>
+
+                <!-- Blockchain Anchoring Details -->
+                <div class="p-3 rounded bg-light border mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-muted small font-sans">Ganache Blockchain Transaction:</span>
+                        {% if log.tx_hash %}
+                        <button type="button" class="btn-icon-copy"
+                            onclick="copyToClipboard('{{ log.tx_hash }}', this, 'Transaction Hash')"
+                            title="Copy Full Tx Hash">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% if log.tx_hash %}
+                    <code class="text-secondary font-mono d-block text-break"
+                        style="font-size: 0.85rem;">{{ log.tx_hash }}</code>
+                    <div class="mt-2 small text-secondary">
+                        Confirmed in Ganache Block <span class="badge-block-num">#{{ log.block_number }}</span>
+                    </div>
+                    {% else %}
+                    <span class="text-muted small font-mono">Not anchored yet (Status: {{ log.anchored_status }})</span>
+                    {% endif %}
+                </div>
+
+                <div class="p-3 rounded bg-light border text-secondary small mb-0">
+                    <i class="bi bi-info-circle text-primary me-1"></i> The canonical SHA-256 hash is calculated
+                    deterministically from the 5 canonical fields: <code>log_id</code>, <code>user_id</code>,
+                    <code>action_type</code>, <code>file_name</code>, and <code>timestamp</code>.
+                </div>
+            </div>
+            <div class="modal-footer modal-footer-custom">
+                <button type="button" class="btn btn-outline-custom btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Dynamic AJAX Verification Engine
+    async function handleVerification(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btn-verify-audit');
+        const feedbackAlert = document.getElementById('verification-feedback-alert');
+        const panelSlot = document.getElementById('verification-panel-slot');
+
+        const originalBtnHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Scanning Ledger & Blockchain...`;
+
+        feedbackAlert.innerHTML = `
+        <div class="alert alert-info border d-flex align-items-center gap-2 mb-4">
+            <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+            <span>Running cross-layer SHA-256 hash comparison between SQLite off-chain records and Ganache Ethereum smart contract...</span>
+        </div>
+    `;
+
+        try {
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            const response = await fetch('/audit/api/verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            renderVerificationResults(data);
+
+            feedbackAlert.innerHTML = `
+            <div class="alert alert-success border d-flex align-items-center justify-content-between mb-4">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                    <span>Verification completed: checked ${data.summary ? data.summary.total_records_checked : 0} records across SQL and Ganache.</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+            showToast('Verification Complete', `Validated ${data.summary ? data.summary.verified : 0} records successfully`, 'success', 4000);
+        } catch (err) {
+            console.error('Verification request failed:', err);
+            feedbackAlert.innerHTML = `
+            <div class="alert alert-danger border d-flex align-items-center justify-content-between mb-4">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-octagon-fill text-danger fs-5"></i>
+                    <span>Verification request failed: ${escapeHtml(err.message)}</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+            showToast('Verification Failed', err.message, 'danger', 4000);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalBtnHtml;
+        }
+    }
+
+    function renderVerificationResults(data) {
+        const slot = document.getElementById('verification-panel-slot');
+        if (!slot) return;
+
+        const sum = data.summary || {};
+        const records = data.records || [];
+
+        let summaryAlertHtml = '';
+        if (data.blockchain_status === 'OFFLINE') {
+            summaryAlertHtml = `
+            <div class="p-3 rounded bg-light border text-secondary small d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-info-circle-fill fs-5 text-primary"></i>
+                <div><strong>Notice:</strong> The local Ganache blockchain node is currently offline. Verification against smart contract trust anchors was paused and classified as <strong>BLOCKCHAIN_UNAVAILABLE</strong>.</div>
+            </div>`;
+        } else if ((sum.tampered || 0) > 0 || (sum.missing_sql || 0) > 0) {
+            summaryAlertHtml = `
+            <div class="p-3 rounded bg-danger bg-opacity-10 border border-danger text-danger small d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-exclamation-octagon-fill fs-4"></i>
+                <div><strong>Tamper Alert:</strong> Discrepancies detected! Off-chain data modification or record deletion was caught by cryptographic verification against the blockchain.</div>
+            </div>`;
+        } else {
+            summaryAlertHtml = `
+            <div class="p-3 rounded bg-success bg-opacity-10 border border-success text-success small d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-shield-check fs-5"></i>
+                <div><strong>Consensus Intact:</strong> All verified off-chain records match their immutable on-chain SHA-256 hashes perfectly.</div>
+            </div>`;
+        }
+
+        let rowsHtml = '';
+        records.slice(0, 10).forEach((item, idx) => {
+            let badgeHtml = '';
+            let rowClass = '';
+
+            if (item.verification_status === 'VERIFIED') {
+                badgeHtml = '<span class="badge-custom badge-verified"><i class="bi bi-check-circle"></i> VERIFIED</span>';
+            } else if (item.verification_status === 'TAMPERED') {
+                badgeHtml = '<span class="badge-custom badge-tampered"><i class="bi bi-x-circle-fill"></i> TAMPERED</span>';
+                rowClass = 'table-danger bg-danger bg-opacity-10';
+            } else if (item.verification_status === 'MISSING_SQL') {
+                badgeHtml = '<span class="badge-custom badge-missing"><i class="bi bi-trash3-fill"></i> MISSING SQL</span>';
+                rowClass = 'table-warning bg-warning bg-opacity-10';
+            } else if (item.verification_status === 'UNANCHORED') {
+                badgeHtml = '<span class="badge-custom badge-unanchored"><i class="bi bi-hourglass-split"></i> UNANCHORED</span>';
+            } else {
+                badgeHtml = '<span class="badge-custom badge-unavailable"><i class="bi bi-wifi-off"></i> OFFLINE</span>';
+            }
+
+            const recalHash = item.recalculated_hash
+                ? `<span class="text-secondary fw-medium" title="${escapeHtml(item.recalculated_hash)}">${escapeHtml(item.recalculated_hash.slice(0, 10))}...${escapeHtml(item.recalculated_hash.slice(-6))}</span>`
+                : '<span class="text-danger fw-bold">None (Deleted)</span>';
+
+            const onChainHash = (item.on_chain_hash && item.on_chain_hash !== 'UNKNOWN')
+                ? `<span class="text-secondary fw-medium" title="${escapeHtml(item.on_chain_hash)}">${escapeHtml(item.on_chain_hash.slice(0, 10))}...${escapeHtml(item.on_chain_hash.slice(-6))}</span>`
+                : '<span class="text-muted">Not on-chain</span>';
+
+            let hashesDetail = '';
+            if (item.recalculated_hash && item.on_chain_hash) {
+                hashesDetail = `
+                <div class="row g-2 font-mono small">
+                    <div class="col-md-6">
+                        <span class="text-muted d-block font-sans">Recalculated Off-Chain Hash:</span>
+                        <code class="text-secondary">${escapeHtml(item.recalculated_hash)}</code>
+                    </div>
+                    <div class="col-md-6">
+                        <span class="text-muted d-block font-sans">Immutable On-Chain Hash:</span>
+                        <code class="text-secondary">${escapeHtml(item.on_chain_hash)}</code>
+                    </div>
+                </div>`;
+            }
+
+            rowsHtml += `
+            <tr class="${rowClass}">
+                <td class="font-mono text-dark small fw-semibold">${escapeHtml(String(item.log_id))}</td>
+                <td class="small text-secondary">${escapeHtml(String(item.user_id))}</td>
+                <td>
+                    <span class="badge-action-type badge-action-${escapeHtml(String(item.action_type))}">${escapeHtml(String(item.action_type))}</span>
+                </td>
+                <td>${badgeHtml}</td>
+                <td class="font-mono small">${recalHash}</td>
+                <td class="font-mono small">${onChainHash}</td>
+                <td class="text-end">
+                    <button class="btn btn-outline-custom btn-sm py-0 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#diag-dyn-${idx}" aria-expanded="false">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                </td>
+            </tr>
+            <tr class="collapse" id="diag-dyn-${idx}">
+                <td colspan="7" class="bg-light p-3">
+                    <div class="small">
+                        <div class="text-dark mb-1 fw-bold"><i class="bi bi-info-circle me-1 text-primary"></i>Diagnostic Detail:</div>
+                        <div class="text-secondary mb-2 font-mono">${escapeHtml(item.details || '')}</div>
+                        ${hashesDetail}
+                    </div>
+                </td>
+            </tr>
+        `;
+        });
+
+        slot.innerHTML = `
+        <div class="soc-card mb-4 border-warning" id="verification-results-panel">
+            <div class="soc-card-header">
+                <div>
+                    <h2 class="h5 soc-card-title">
+                        <i class="bi bi-cpu-fill text-primary"></i>
+                        <span>Cryptographic Verification Report</span>
+                    </h2>
+                    <span class="text-secondary small">Generated at ${escapeHtml(data.timestamp || new Date().toISOString())}</span>
+                </div>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <span class="badge-custom badge-verified">
+                        <i class="bi bi-check-circle-fill"></i> ${sum.verified || 0} Verified
+                    </span>
+                    ${(sum.tampered || 0) > 0 ? `<span class="badge-custom badge-tampered"><i class="bi bi-exclamation-triangle-fill"></i> ${sum.tampered} Tampered</span>` : ''}
+                    ${(sum.missing_sql || 0) > 0 ? `<span class="badge-custom badge-missing"><i class="bi bi-trash3-fill"></i> ${sum.missing_sql} Missing SQL</span>` : ''}
+                    ${(sum.unanchored || 0) > 0 ? `<span class="badge-custom badge-unanchored"><i class="bi bi-clock-history"></i> ${sum.unanchored} Unanchored</span>` : ''}
+                    ${(sum.blockchain_unavailable || 0) > 0 ? `<span class="badge-custom badge-unavailable"><i class="bi bi-wifi-off"></i> ${sum.blockchain_unavailable} Offline</span>` : ''}
+                </div>
+            </div>
+
+            <div class="p-4">
+                ${summaryAlertHtml}
+
+                <div class="table-responsive">
+                    <table class="table-custom mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>Log ID</th>
+                                <th>Actor</th>
+                                <th>Action</th>
+                                <th>Status</th>
+                                <th>Recalculated SHA-256 (Off-Chain)</th>
+                                <th>Anchored SHA-256 (Blockchain)</th>
+                                <th class="text-end">Diagnostics</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const verifyForm = document.getElementById('verify-form');
+        if (verifyForm) {
+            verifyForm.addEventListener('submit', handleVerification);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,162 @@
+{
+  "metadata": {
+    "title": "Blockchain-Based Secure Cloud Audit Logging - Empirical Performance Results",
+    "project": "B.Tech CSE Major Project 2026-2027",
+    "students": "Shourya Upadhyay (2410031159), Jeevesh Pachauri (2410031186)",
+    "institution": "School of Computer Science and Engineering, IILM University, Greater Noida"
+  },
+  "environment": {
+    "os_name": "Windows",
+    "os_release": "10",
+    "os_version": "10.0.26100",
+    "architecture": "AMD64",
+    "processor": "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel",
+    "cpu_cores_logical": 8,
+    "python_version": "3.11.9",
+    "python_compiler": "MSC v.1938 64 bit (AMD64)",
+    "benchmarked_at": "2026-10-29T19:33:15.773765+00:00"
+  },
+  "results": {
+    "canonical_hashing": {
+      "10": {
+        "record_count": 10,
+        "trials": 3,
+        "avg_duration_seconds": 4e-05,
+        "min_duration_seconds": 2e-05,
+        "max_duration_seconds": 7e-05,
+        "throughput_hashes_per_sec": 248962.68,
+        "latency_us_per_hash": 4.02
+      },
+      "50": {
+        "record_count": 50,
+        "trials": 3,
+        "avg_duration_seconds": 0.00012,
+        "min_duration_seconds": 0.00012,
+        "max_duration_seconds": 0.00012,
+        "throughput_hashes_per_sec": 408608.02,
+        "latency_us_per_hash": 2.45
+      },
+      "100": {
+        "record_count": 100,
+        "trials": 3,
+        "avg_duration_seconds": 0.00025,
+        "min_duration_seconds": 0.00024,
+        "max_duration_seconds": 0.00026,
+        "throughput_hashes_per_sec": 398724.08,
+        "latency_us_per_hash": 2.51
+      },
+      "250": {
+        "record_count": 250,
+        "trials": 3,
+        "avg_duration_seconds": 0.0007,
+        "min_duration_seconds": 0.00066,
+        "max_duration_seconds": 0.00074,
+        "throughput_hashes_per_sec": 356938.89,
+        "latency_us_per_hash": 2.8
+      },
+      "500": {
+        "record_count": 500,
+        "trials": 3,
+        "avg_duration_seconds": 0.00149,
+        "min_duration_seconds": 0.00141,
+        "max_duration_seconds": 0.00163,
+        "throughput_hashes_per_sec": 335728.19,
+        "latency_us_per_hash": 2.98
+      }
+    },
+    "sqlite_persistence": {
+      "10": {
+        "record_count": 10,
+        "trials": 3,
+        "avg_duration_seconds": 0.00444,
+        "min_duration_seconds": 0.00379,
+        "max_duration_seconds": 0.00571,
+        "throughput_events_per_sec": 2254.55,
+        "latency_ms_per_event": 0.44
+      },
+      "50": {
+        "record_count": 50,
+        "trials": 3,
+        "avg_duration_seconds": 0.01881,
+        "min_duration_seconds": 0.01692,
+        "max_duration_seconds": 0.01988,
+        "throughput_events_per_sec": 2658.54,
+        "latency_ms_per_event": 0.38
+      },
+      "100": {
+        "record_count": 100,
+        "trials": 3,
+        "avg_duration_seconds": 0.03979,
+        "min_duration_seconds": 0.03505,
+        "max_duration_seconds": 0.04872,
+        "throughput_events_per_sec": 2513.36,
+        "latency_ms_per_event": 0.4
+      },
+      "250": {
+        "record_count": 250,
+        "trials": 3,
+        "avg_duration_seconds": 0.09573,
+        "min_duration_seconds": 0.08381,
+        "max_duration_seconds": 0.10464,
+        "throughput_events_per_sec": 2611.4,
+        "latency_ms_per_event": 0.38
+      },
+      "500": {
+        "record_count": 500,
+        "trials": 3,
+        "avg_duration_seconds": 0.20686,
+        "min_duration_seconds": 0.20129,
+        "max_duration_seconds": 0.21651,
+        "throughput_events_per_sec": 2417.06,
+        "latency_ms_per_event": 0.41
+      }
+    },
+    "verification_engine": {
+      "10": {
+        "record_count": 10,
+        "trials": 3,
+        "avg_duration_seconds": 0.00354,
+        "min_duration_seconds": 0.00284,
+        "max_duration_seconds": 0.00466,
+        "throughput_verifications_per_sec": 2824.7,
+        "latency_ms_per_record": 0.354
+      },
+      "50": {
+        "record_count": 50,
+        "trials": 3,
+        "avg_duration_seconds": 0.01424,
+        "min_duration_seconds": 0.01396,
+        "max_duration_seconds": 0.0145,
+        "throughput_verifications_per_sec": 3511.48,
+        "latency_ms_per_record": 0.285
+      },
+      "100": {
+        "record_count": 100,
+        "trials": 3,
+        "avg_duration_seconds": 0.04492,
+        "min_duration_seconds": 0.02829,
+        "max_duration_seconds": 0.07682,
+        "throughput_verifications_per_sec": 2226.38,
+        "latency_ms_per_record": 0.449
+      },
+      "250": {
+        "record_count": 250,
+        "trials": 3,
+        "avg_duration_seconds": 0.08331,
+        "min_duration_seconds": 0.08048,
+        "max_duration_seconds": 0.08727,
+        "throughput_verifications_per_sec": 3000.84,
+        "latency_ms_per_record": 0.333
+      },
+      "500": {
+        "record_count": 500,
+        "trials": 3,
+        "avg_duration_seconds": 0.16126,
+        "min_duration_seconds": 0.1436,
+        "max_duration_seconds": 0.17842,
+        "throughput_verifications_per_sec": 3100.67,
+        "latency_ms_per_record": 0.323
+      }
+    }
+  }
+}

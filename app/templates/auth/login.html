@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Sign In — CloudAuditChain Security Console{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+    <div class="col-md-7 col-lg-5 col-xl-4">
+        <div class="soc-card p-4 p-md-5" style="border-top: 3px solid var(--accent-blue);">
+            <div class="text-center mb-4">
+                <div class="brand-icon-box mx-auto mb-3" style="width: 52px; height: 52px; font-size: 1.6rem; border-radius: var(--radius-md);">
+                    <i class="bi bi-shield-lock-fill"></i>
+                </div>
+                <h1 class="h4 fw-bold text-dark mb-1">Security Sign In</h1>
+                <p class="small text-secondary mb-0">Authenticate to access cloud storage and verified audit records</p>
+            </div>
+
+            <form method="POST" action="{{ url_for('auth.login') }}" id="login-form" onsubmit="handleFormSubmitLoading(this, 'Authenticating...');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+
+                <div class="mb-3">
+                    <label for="username" class="form-label-custom">
+                        <span>Username</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border text-secondary">
+                            <i class="bi bi-person"></i>
+                        </span>
+                        <input type="text" class="form-control form-control-custom" id="username" name="username" value="{{ username or '' }}" required autofocus autocomplete="username" placeholder="Enter your username">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="password" class="form-label-custom">
+                        <span>Password</span>
+                    </label>
+                    <div class="input-group password-toggle-group">
+                        <span class="input-group-text bg-light border text-secondary">
+                            <i class="bi bi-key"></i>
+                        </span>
+                        <input type="password" class="form-control form-control-custom" id="password" name="password" required autocomplete="current-password" placeholder="Enter your password">
+                        <button class="password-toggle-btn" type="button" data-target="password" aria-label="Show password" title="Toggle password visibility">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary-custom w-100 mb-3 justify-content-center" id="btn-login-submit">
+                    <i class="bi bi-box-arrow-in-right me-1"></i> Sign In to Platform
+                </button>
+            </form>
+
+            <div class="p-3 rounded bg-light border text-secondary small text-center mb-3" style="font-size: 0.75rem;">
+                <i class="bi bi-shield-check text-primary me-1"></i> Protected by EVM Audit Layer &bull; Session access is monitored and logged to off-chain SQL and Ganache.
+            </div>
+
+            <div class="text-center pt-3 border-top border-light-subtle">
+                <span class="text-secondary small">Need a user account?</span>
+                <a href="{{ url_for('auth.register') }}" class="small fw-semibold ms-1 text-primary text-decoration-none">Register here</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

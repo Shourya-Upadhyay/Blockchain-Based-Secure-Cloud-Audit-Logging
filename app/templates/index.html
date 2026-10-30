@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}Enterprise Security Overview — CloudAuditChain{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Compact Executive Operations Header -->
+    <div class="col-12">
+        <div class="soc-card p-4" style="border-top: 3px solid var(--accent-blue);">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                <div>
+                    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 mb-2 rounded-pill" style="background: #EFF6FF; border: 1px solid #BFDBFE;">
+                        <span class="status-dot active"></span>
+                        <span class="small fw-medium" style="font-size: 0.75rem; color: #1D4ED8;">EVM AUDIT TELEMETRY ACTIVE</span>
+                    </div>
+                    <h1 class="h3 fw-bold mb-1 text-dark">Enterprise Security & Integrity Console</h1>
+                    <p class="text-secondary small mb-0" style="max-width: 760px;">
+                        Continuous dual-layer cryptographic monitoring combining high-throughput relational SQL logging with immutable SHA-256 state anchoring on Ganache Ethereum smart contracts.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    {% if current_user and current_user.is_auditor %}
+                        <a href="{{ url_for('audit.dashboard') }}" class="btn btn-teal-custom" id="hero-btn-auditor">
+                            <i class="bi bi-shield-check"></i> Auditor Console
+                        </a>
+                    {% endif %}
+                    <a href="{{ url_for('cloud.files') }}" class="btn btn-primary-custom" id="hero-btn-cloud">
+                        <i class="bi bi-folder2-open"></i> Cloud Storage
+                    </a>
+                    <a href="{{ url_for('health_check') }}" target="_blank" class="btn btn-outline-custom" id="hero-btn-health">
+                        <i class="bi bi-activity text-primary"></i> Diagnostics
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6 Security KPI Matrix Cards -->
+    <div class="col-6 col-lg-2">
+        <div class="kpi-card" style="--kpi-accent: var(--accent-blue); --kpi-icon-bg: #EFF6FF;">
+            <div class="kpi-header">
+                <span class="kpi-label">Audit Events</span>
+                <div class="kpi-icon"><i class="bi bi-journal-code"></i></div>
+            </div>
+            <div class="kpi-value text-dark">{{ stats.total_events }}</div>
+            <div class="kpi-meta text-muted">
+                <i class="bi bi-database-check text-primary"></i> Recorded in SQL
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-2">
+        <div class="kpi-card" style="--kpi-accent: var(--status-verified); --kpi-icon-bg: #ECFDF5;">
+            <div class="kpi-header">
+                <span class="kpi-label">Anchored</span>
+                <div class="kpi-icon"><i class="bi bi-shield-fill-check"></i></div>
+            </div>
+            <div class="kpi-value text-success">{{ stats.anchored_count }}</div>
+            <div class="kpi-meta text-muted">
+                {% if stats.total_events > 0 %}
+                    <span class="text-success fw-semibold">{{ ((stats.anchored_count / stats.total_events) * 100) | round(1) }}%</span> on-chain rate
+                {% else %}
+                    <span>0% rate</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-2">
+        <div class="kpi-card" style="--kpi-accent: var(--status-pending); --kpi-icon-bg: #FFFBEB;">
+            <div class="kpi-header">
+                <span class="kpi-label">Pending Queue</span>
+                <div class="kpi-icon"><i class="bi bi-hourglass-split"></i></div>
+            </div>
+            <div class="kpi-value text-warning">{{ stats.pending_count }}</div>
+            <div class="kpi-meta text-muted">
+                {% if stats.pending_count == 0 %}
+                    <span class="text-success"><i class="bi bi-check2"></i> Zero latency</span>
+                {% else %}
+                    <span class="text-warning">Awaiting mining</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-2">
+        <div class="kpi-card" style="--kpi-accent: {% if integrity_status == 'VERIFIED' %}var(--status-verified){% elif integrity_status == 'FAILED' %}var(--status-danger){% elif integrity_status == 'UNAVAILABLE' %}var(--status-pending){% else %}var(--border-medium){% endif %}; --kpi-icon-bg: #F1F5F9;">
+            <div class="kpi-header">
+                <span class="kpi-label">Ledger Integrity</span>
+                <div class="kpi-icon"><i class="bi bi-fingerprint"></i></div>
+            </div>
+            <div class="kpi-value" style="font-size: 1.35rem; padding-top: 0.2rem;">
+                {% if integrity_status == 'VERIFIED' %}
+                    <span class="text-success d-flex align-items-center gap-1"><i class="bi bi-check-circle-fill fs-6"></i> VERIFIED</span>
+                {% elif integrity_status == 'FAILED' %}
+                    <span class="text-danger d-flex align-items-center gap-1"><i class="bi bi-exclamation-octagon-fill fs-6"></i> TAMPERED</span>
+                {% elif integrity_status == 'UNAVAILABLE' %}
+                    <span class="text-warning d-flex align-items-center gap-1"><i class="bi bi-wifi-off fs-6"></i> OFFLINE</span>
+                {% else %}
+                    <span class="text-secondary d-flex align-items-center gap-1"><i class="bi bi-shield fs-6"></i> UNTESTED</span>
+                {% endif %}
+            </div>
+            <div class="kpi-meta text-muted text-truncate" title="{{ verification_timestamp or 'Run Auditor Console' }}">
+                {% if verification_timestamp %}
+                    {{ verification_timestamp[:19] }}Z
+                {% else %}
+                    Verify in console
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-2">
+        <div class="kpi-card" style="--kpi-accent: var(--accent-indigo); --kpi-icon-bg: #EEF2FF;">
+            <div class="kpi-header">
+                <span class="kpi-label">Storage Assets</span>
+                <div class="kpi-icon"><i class="bi bi-folder-check"></i></div>
+            </div>
+            <div class="kpi-value text-dark">{{ total_files }}</div>
+            <div class="kpi-meta text-muted">
+                <span class="text-secondary">{{ formatted_storage }}</span> allocated
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-2">
+        <div class="kpi-card" style="--kpi-accent: var(--accent-teal); --kpi-icon-bg: #F0FDFA;">
+            <div class="kpi-header">
+                <span class="kpi-label">Block Height</span>
+                <div class="kpi-icon"><i class="bi bi-boxes"></i></div>
+            </div>
+            <div class="kpi-value text-dark" style="font-size: 1.5rem; padding-top: 0.1rem;">
+                {% if blockchain_status.connected %}
+                    #{{ blockchain_status.block_number }}
+                {% else %}
+                    <span class="text-secondary">Offline</span>
+                {% endif %}
+            </div>
+            <div class="kpi-meta text-muted">
+                {% if blockchain_status.connected %}
+                    <span class="text-success"><i class="bi bi-link-45deg"></i> Ganache 1337</span>
+                {% else %}
+                    <span class="text-danger">RPC disconnected</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive Action Distribution & Architecture Engine -->
+    <div class="col-lg-8">
+        <div class="soc-card h-100 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="h5 fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-pie-chart-fill text-primary"></i>
+                        <span>Audit Event Distribution</span>
+                    </h2>
+                    <span class="text-muted small">Real-time classification of logged operations across all users</span>
+                </div>
+                <span class="badge bg-light border text-secondary font-mono" style="font-size: 0.72rem;">TOTAL: {{ stats.total_events }} EVENTS</span>
+            </div>
+
+            {% set total = stats.total_events %}
+            {% set up_count = action_breakdown.get('UPLOAD', 0) %}
+            {% set down_count = action_breakdown.get('DOWNLOAD', 0) %}
+            {% set mod_count = action_breakdown.get('MODIFY', 0) %}
+            {% set del_count = action_breakdown.get('DELETE', 0) %}
+            {% set log_count = action_breakdown.get('LOGIN', 0) %}
+
+            <!-- Segmented Distribution Pulse Bar -->
+            <div class="activity-pulse-bar" title="Event Distribution Breakdown">
+                {% if total > 0 %}
+                    <div class="pulse-segment" style="width: {{ (up_count / total * 100) }}%; background: #0D9488;" title="UPLOAD: {{ up_count }}"></div>
+                    <div class="pulse-segment" style="width: {{ (down_count / total * 100) }}%; background: #0284C7;" title="DOWNLOAD: {{ down_count }}"></div>
+                    <div class="pulse-segment" style="width: {{ (mod_count / total * 100) }}%; background: #D97706;" title="MODIFY: {{ mod_count }}"></div>
+                    <div class="pulse-segment" style="width: {{ (del_count / total * 100) }}%; background: #DC2626;" title="DELETE: {{ del_count }}"></div>
+                    <div class="pulse-segment" style="width: {{ (log_count / total * 100) }}%; background: #4F46E5;" title="LOGIN: {{ log_count }}"></div>
+                {% else %}
+                    <div class="pulse-segment" style="width: 100%; background: #E2E8F0;"></div>
+                {% endif %}
+            </div>
+
+            <!-- Legend Chips -->
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <div class="legend-chip">
+                    <span class="status-dot" style="background: #0D9488;"></span>
+                    <span class="fw-semibold text-dark">Upload</span>
+                    <span class="font-mono text-muted">({{ up_count }})</span>
+                </div>
+                <div class="legend-chip">
+                    <span class="status-dot" style="background: #0284C7;"></span>
+                    <span class="fw-semibold text-dark">Download</span>
+                    <span class="font-mono text-muted">({{ down_count }})</span>
+                </div>
+                <div class="legend-chip">
+                    <span class="status-dot" style="background: #D97706;"></span>
+                    <span class="fw-semibold text-dark">Modify</span>
+                    <span class="font-mono text-muted">({{ mod_count }})</span>
+                </div>
+                <div class="legend-chip">
+                    <span class="status-dot" style="background: #DC2626;"></span>
+                    <span class="fw-semibold text-dark">Delete</span>
+                    <span class="font-mono text-muted">({{ del_count }})</span>
+                </div>
+                <div class="legend-chip">
+                    <span class="status-dot" style="background: #4F46E5;"></span>
+                    <span class="fw-semibold text-dark">Login</span>
+                    <span class="font-mono text-muted">({{ log_count }})</span>
+                </div>
+            </div>
+
+            <!-- Dual-Layer Cryptographic Architecture Pipeline -->
+            <div class="mt-4 pt-3 border-top border-light-subtle">
+                <div class="text-secondary small fw-bold text-uppercase tracking-wider mb-2">Cryptographic Pipeline Architecture</div>
+                <div class="row g-2 text-center">
+                    <div class="col-4">
+                        <div class="p-3 rounded bg-light border">
+                            <i class="bi bi-database-check text-primary fs-5"></i>
+                            <div class="small fw-semibold text-dark mt-1">Off-Chain Relational</div>
+                            <div class="text-muted" style="font-size: 0.7rem;">SQLite Ledger Storage</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded bg-light border">
+                            <i class="bi bi-cpu text-secondary fs-5"></i>
+                            <div class="small fw-semibold text-dark mt-1">SHA-256 Digest</div>
+                            <div class="text-muted" style="font-size: 0.7rem;">Deterministic Hash</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 rounded bg-light border">
+                            <i class="bi bi-link-45deg text-success fs-5"></i>
+                            <div class="small fw-semibold text-dark mt-1">EVM Smart Contract</div>
+                            <div class="text-muted" style="font-size: 0.7rem;">Ganache On-Chain Block</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Infrastructure Diagnostic Panel -->
+    <div class="col-lg-4">
+        <div class="soc-card h-100 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h5 fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                    <i class="bi bi-hdd-network text-primary"></i>
+                    <span>Network & Contract</span>
+                </h2>
+                {% if blockchain_status.connected %}
+                    <span class="badge-custom badge-verified"><i class="bi bi-wifi"></i> ONLINE</span>
+                {% else %}
+                    <span class="badge-custom badge-tampered"><i class="bi bi-wifi-off"></i> OFFLINE</span>
+                {% endif %}
+            </div>
+
+            <div class="d-flex flex-column gap-3 small">
+                <div class="p-2 rounded bg-light border">
+                    <div class="text-muted" style="font-size: 0.7rem; text-transform: uppercase;">RPC Endpoint</div>
+                    <div class="text-dark font-mono text-truncate">{{ blockchain_status.rpc_url }}</div>
+                </div>
+
+                <div class="p-2 rounded bg-light border">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted" style="font-size: 0.7rem; text-transform: uppercase;">Contract Address</span>
+                        {% if blockchain_status.contract_address %}
+                            <button type="button" class="btn-icon-copy" onclick="copyToClipboard('{{ blockchain_status.contract_address }}', this, 'Contract Address')" title="Copy Contract Address">
+                                <i class="bi bi-clipboard"></i>
+                            </button>
+                        {% endif %}
+                    </div>
+                    <div class="text-dark font-mono text-truncate" title="{{ blockchain_status.contract_address }}">
+                        {{ blockchain_status.contract_address or 'Not deployed' }}
+                    </div>
+                </div>
+
+                <div class="p-2 rounded bg-light border">
+                    <div class="text-muted" style="font-size: 0.7rem; text-transform: uppercase;">Deployer / Authority Account</div>
+                    <div class="text-secondary font-mono text-truncate" title="{{ blockchain_status.deployer_address }}">
+                        {{ blockchain_status.deployer_address or 'Unavailable' }}
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center px-1 text-muted" style="font-size: 0.75rem;">
+                    <span>EVM Chain ID</span>
+                    <span class="text-dark font-mono">{{ blockchain_status.chain_id or '1337' }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Recent Security Events Table -->
+    <div class="col-12">
+        <div class="soc-card overflow-hidden">
+            <div class="soc-card-header">
+                <div>
+                    <h2 class="h5 soc-card-title">
+                        <i class="bi bi-clock-history text-primary"></i>
+                        <span>Recent Security & Audit Events</span>
+                    </h2>
+                    <span class="text-muted small">Latest authenticated operations captured in the canonical audit ledger</span>
+                </div>
+                {% if current_user and current_user.is_auditor %}
+                    <a href="{{ url_for('audit.dashboard') }}" class="btn btn-outline-custom btn-sm">
+                        <span>View All in Auditor Console</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                {% endif %}
+            </div>
+
+            {% if recent_logs %}
+                <div class="table-responsive">
+                    <table class="table-custom align-middle mb-0" id="recent-logs-table">
+                        <thead>
+                            <tr>
+                                <th>Log Identifier</th>
+                                <th>Action Type</th>
+                                <th>Actor</th>
+                                <th>Target Asset</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>Blockchain Status</th>
+                                <th class="text-end pe-4">Transaction Reference</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_logs %}
+                                <tr>
+                                    <td>
+                                        <div class="d-inline-flex align-items-center gap-1 font-mono text-dark fw-medium">
+                                            <span>{{ log.log_id }}</span>
+                                            <button type="button" class="btn-icon-copy" onclick="copyToClipboard('{{ log.log_id }}', this, 'Log ID')" title="Copy Log ID">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge-action-type badge-action-{{ log.action_type }}">{{ log.action_type }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-dark fw-medium">{{ log.user_id }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-secondary font-mono">{{ log.file_name }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="audit-timestamp">{{ log.timestamp }}</span>
+                                    </td>
+                                    <td>
+                                        {% if log.anchored_status == 'ANCHORED' %}
+                                            <span class="badge-custom badge-verified">
+                                                <i class="bi bi-shield-fill-check"></i> ANCHORED
+                                            </span>
+                                        {% elif log.anchored_status == 'PENDING' %}
+                                            <span class="badge-custom badge-pending">
+                                                <i class="bi bi-hourglass-split"></i> PENDING
+                                            </span>
+                                        {% else %}
+                                            <span class="badge-custom badge-tampered">
+                                                <i class="bi bi-exclamation-octagon-fill"></i> {{ log.anchored_status }}
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        {% if log.tx_hash %}
+                                            <div class="d-inline-flex align-items-center gap-1">
+                                                <span class="badge-tx-hash" title="{{ log.tx_hash }}">
+                                                    {{ log.tx_hash[:10] }}...{{ log.tx_hash[-8:] }}
+                                                </span>
+                                                <button type="button" class="btn-icon-copy" onclick="copyToClipboard('{{ log.tx_hash }}', this, 'Transaction Hash')" title="Copy Full Transaction Hash">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                                {% if log.block_number %}
+                                                    <span class="badge-block-num" title="Mined in Ganache Block #{{ log.block_number }}">
+                                                        #{{ log.block_number }}
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted font-mono small">Pending on-chain</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-journal-x fs-1 mb-2 d-block text-secondary"></i>
+                    <div class="fw-semibold text-dark">No audit records found</div>
+                    <div class="small">Perform file actions or sign in to generate authenticated audit entries.</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

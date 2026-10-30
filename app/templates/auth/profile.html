@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}User Security Profile — CloudAuditChain{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+    <div class="col-lg-8">
+        {% if auditor_access_granted %}
+            <div class="alert alert-success border mb-4 shadow-sm" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-shield-check-fill fs-4 me-3 text-success"></i>
+                    <div>
+                        <div class="fw-bold">RBAC Verification Succeeded</div>
+                        <div class="small">Your session has been validated as an authorized <strong>Auditor</strong>. Server-side access to administrative audit trails and contract proofs is active.</div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="soc-card mb-4" style="border-top: 3px solid var(--accent-indigo);">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 pb-3 border-bottom border-light-subtle mb-4 p-4 pb-0">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="brand-icon-box" style="width: 56px; height: 56px; font-size: 1.6rem; border-radius: var(--radius-md);">
+                        <i class="bi bi-person-badge"></i>
+                    </div>
+                    <div>
+                        <h1 class="h4 fw-bold text-dark mb-0">{{ user.username }}</h1>
+                        <div class="small text-secondary">Authenticated Account Profile & Telemetry</div>
+                    </div>
+                </div>
+                <div>
+                    {% if user.is_auditor %}
+                        <span class="badge-custom badge-verified" style="font-size: 0.85rem;">
+                            <i class="bi bi-patch-check-fill"></i> Auditor Role Active
+                        </span>
+                    {% else %}
+                        <span class="badge-custom badge-pending" style="font-size: 0.85rem;">
+                            <i class="bi bi-person-check-fill"></i> Standard Cloud User
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="p-4 pt-0">
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-6">
+                        <div class="p-3 rounded bg-light border">
+                            <div class="text-muted small" style="font-size: 0.72rem; text-transform: uppercase;">User Identifier</div>
+                            <div class="h5 fw-bold text-dark font-mono mb-0">ID #{{ user.id }}</div>
+                            <div class="text-muted small mt-1">Primary database entity key</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="p-3 rounded bg-light border">
+                            <div class="text-muted small" style="font-size: 0.72rem; text-transform: uppercase;">Account Established</div>
+                            <div class="h5 fw-bold text-dark font-mono mb-0">
+                                {{ user.created_at.strftime('%Y-%m-%d %H:%M UTC') if user.created_at else 'Active' }}
+                            </div>
+                            <div class="text-muted small mt-1">Registration UTC timestamp</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Role Access Permissions Summary -->
+                <div class="p-4 rounded bg-light border mb-4">
+                    <h2 class="h6 fw-bold text-dark mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-shield-lock text-primary"></i>
+                        <span>Enforced Permissions Matrix</span>
+                    </h2>
+                    <div class="d-flex flex-column gap-2 small">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                            <div>
+                                <strong class="text-dark">Cloud Storage Workspace:</strong>
+                                <span class="text-secondary"> Authorized to upload, download, modify, and delete personal files with automatic SHA-256 audit triggers.</span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-start gap-2">
+                            {% if user.is_auditor %}
+                                <i class="bi bi-check-circle-fill text-success mt-1"></i>
+                                <div>
+                                    <strong class="text-dark">Auditor Verification Console:</strong>
+                                    <span class="text-success"> Authorized to inspect cryptographic proofs and trigger smart contract cross-layer hash comparisons.</span>
+                                </div>
+                            {% else %}
+                                <i class="bi bi-x-circle-fill text-danger mt-1"></i>
+                                <div>
+                                    <strong class="text-muted">Auditor Verification Console:</strong>
+                                    <span class="text-muted"> Restricted (Access denied by server-side <code>@auditor_required</code> authorization decorator).</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex align-items-start gap-2">
+                            {% if user.is_auditor %}
+                                <i class="bi bi-check-circle-fill text-warning mt-1"></i>
+                                <div>
+                                    <strong class="text-dark">Tamper Demonstration Bench:</strong>
+                                    <span class="text-warning"> Authorized to execute controlled developer-mode tampering simulations.</span>
+                                </div>
+                            {% else %}
+                                <i class="bi bi-x-circle-fill text-muted mt-1"></i>
+                                <div>
+                                    <strong class="text-muted">Tamper Demonstration Bench:</strong>
+                                    <span class="text-muted"> Restricted to authorized security auditors.</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions & Tests -->
+                <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center pt-2 border-top border-light-subtle">
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('auth.auditor_only_test') }}" class="btn btn-outline-custom btn-sm" id="btn-test-auditor-route">
+                            <i class="bi bi-shield-check text-primary"></i> Test Auditor Route Access
+                        </a>
+                    </div>
+                    <form method="POST" action="{{ url_for('auth.logout') }}" class="m-0">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-logout">
+                            <i class="bi bi-box-arrow-right"></i> Sign Out
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

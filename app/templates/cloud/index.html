@@ -1,0 +1,505 @@
+{% extends "base.html" %}
+
+{% block title %}Cloud Object Storage — CloudAuditChain{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Storage Management Console Header -->
+    <div class="col-12">
+        <div class="soc-card p-4" style="border-top: 3px solid var(--accent-indigo);">
+            <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                <div>
+                    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 mb-2 rounded-pill" style="background: #EEF2FF; border: 1px solid #C7D2FE;">
+                        <i class="bi bi-hdd-stack" style="color: var(--accent-indigo);"></i>
+                        <span class="small fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.04em; color: var(--accent-indigo);">ISOLATED STORAGE WORKSPACE</span>
+                    </div>
+                    <h1 class="h3 fw-bold text-dark mb-1">Cloud Object Storage Repository</h1>
+                    <p class="small text-secondary mb-0" style="max-width: 760px;">
+                        Enterprise cloud file system with automatic cryptographic SHA-256 audit hashing and immutable Ganache blockchain anchoring on every ingestion, retrieval, mutation, or purge.
+                    </p>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#uploadModal" id="btn-open-upload-modal">
+                        <i class="bi bi-cloud-arrow-up-fill fs-5"></i>
+                        <span>Upload File</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Storage Metrics Bar -->
+            <div class="row g-3 mt-3 pt-3 border-top border-light-subtle">
+                <div class="col-sm-4">
+                    <div class="p-3 rounded bg-light border d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="text-muted small" style="font-size: 0.72rem; text-transform: uppercase;">Stored Objects</div>
+                            <div class="h4 fw-bold text-dark mb-0" id="stat-total-files">{{ total_files }}</div>
+                        </div>
+                        <i class="bi bi-files text-primary fs-3"></i>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="p-3 rounded bg-light border d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="text-muted small" style="font-size: 0.72rem; text-transform: uppercase;">Storage Allocated</div>
+                            <div class="h4 fw-bold text-dark mb-0" id="stat-total-storage">{{ total_storage }}</div>
+                        </div>
+                        <i class="bi bi-pie-chart text-secondary fs-3"></i>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="p-3 rounded bg-light border d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="text-muted small" style="font-size: 0.72rem; text-transform: uppercase;">Security Protocol</div>
+                            <div class="h6 fw-bold text-success mb-0 d-flex align-items-center gap-1">
+                                <i class="bi bi-shield-check"></i> Path Isolation
+                            </div>
+                        </div>
+                        <i class="bi bi-link-45deg text-success fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Management Container -->
+    <div class="col-12">
+        <div class="soc-card overflow-hidden">
+            <!-- Toolbar: Search, Filters & View Toggle -->
+            <div class="p-3 border-bottom border-light-subtle d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <h2 class="h5 fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-folder2-open text-primary"></i>
+                        <span>Stored Cloud Files</span>
+                    </h2>
+                    {% if current_user and current_user.is_auditor %}
+                        <span class="badge-custom badge-verified" style="font-size: 0.72rem;">
+                            <i class="bi bi-eye-fill"></i> Auditor Global Scope
+                        </span>
+                    {% endif %}
+                </div>
+
+                <!-- Search & Filters Cluster -->
+                <div class="d-flex align-items-center gap-2 flex-wrap" style="max-width: 480px; width: 100%;">
+                    <div class="input-group input-group-sm flex-grow-1">
+                        <span class="input-group-text bg-light border text-secondary"><i class="bi bi-search"></i></span>
+                        <input type="text" id="file-search-input" class="form-control form-control-custom form-control-sm" placeholder="Filter files by name...">
+                    </div>
+                    <!-- View Mode Toggle -->
+                    <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+                        <button type="button" class="btn btn-outline-custom active" id="btn-view-table" title="Table View">
+                            <i class="bi bi-list-ul"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-custom" id="btn-view-grid" title="Grid View">
+                            <i class="bi bi-grid-fill"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {% if files %}
+                <!-- Table View Mode -->
+                <div id="files-table-container" class="table-responsive">
+                    <table class="table-custom mb-0 align-middle" id="files-table">
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Size</th>
+                                <th>Uploaded At</th>
+                                <th>Last Modified</th>
+                                {% if current_user and current_user.is_auditor %}
+                                    <th>Owner</th>
+                                {% endif %}
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="files-table-body">
+                            {% for file in files %}
+                                {% set ext = file.filename.split('.')[-1].lower() if '.' in file.filename else '' %}
+                                <tr class="file-row" data-filename="{{ file.filename | lower }}" data-ext="{{ ext }}">
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            {% if ext in ['pdf'] %}
+                                                <i class="bi bi-file-earmark-pdf-fill fs-5 text-danger"></i>
+                                            {% elif ext in ['csv', 'xlsx', 'xls'] %}
+                                                <i class="bi bi-file-earmark-spreadsheet-fill fs-5 text-success"></i>
+                                            {% elif ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'] %}
+                                                <i class="bi bi-file-earmark-image-fill fs-5 text-primary"></i>
+                                            {% elif ext in ['py', 'js', 'json', 'sol', 'html', 'css', 'sql'] %}
+                                                <i class="bi bi-file-earmark-code-fill fs-5 text-warning"></i>
+                                            {% elif ext in ['txt', 'md', 'doc', 'docx'] %}
+                                                <i class="bi bi-file-earmark-text-fill fs-5 text-secondary"></i>
+                                            {% elif ext in ['zip', 'tar', 'gz', 'rar'] %}
+                                                <i class="bi bi-file-earmark-zip-fill fs-5" style="color: var(--accent-indigo);"></i>
+                                            {% else %}
+                                                <i class="bi bi-file-earmark-fill fs-5 text-primary"></i>
+                                            {% endif %}
+                                            <span class="fw-semibold text-dark font-mono" id="file-name-{{ file.id }}">{{ file.filename }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light border text-secondary font-mono">{{ file.formatted_size }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="audit-timestamp">{{ file.upload_date.strftime('%Y-%m-%d %H:%M:%S UTC') if file.upload_date else 'N/A' }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="audit-timestamp">{{ file.last_modified.strftime('%Y-%m-%d %H:%M:%S UTC') if file.last_modified else 'N/A' }}</span>
+                                    </td>
+                                    {% if current_user and current_user.is_auditor %}
+                                        <td>
+                                            <span class="badge bg-light border text-secondary fw-medium">{{ file.owner.username if file.owner else ('User #' ~ file.owner_id) }}</span>
+                                        </td>
+                                    {% endif %}
+                                    <td class="text-end pe-4">
+                                        <div class="d-inline-flex align-items-center gap-1">
+                                            <!-- Metadata Inspection Trigger -->
+                                            <button type="button" class="btn btn-outline-custom btn-sm py-1 px-2 btn-inspect-file"
+                                                    data-file-id="{{ file.id }}"
+                                                    data-file-name="{{ file.filename }}"
+                                                    data-file-size="{{ file.formatted_size }} ({{ file.filesize }} bytes)"
+                                                    data-file-owner="{{ file.owner_id }}"
+                                                    data-file-upload="{{ file.upload_date.strftime('%Y-%m-%d %H:%M:%S UTC') if file.upload_date else 'N/A' }}"
+                                                    data-file-modified="{{ file.last_modified.strftime('%Y-%m-%d %H:%M:%S UTC') if file.last_modified else 'N/A' }}"
+                                                    title="Inspect File Metadata">
+                                                <i class="bi bi-info-circle text-primary"></i>
+                                            </button>
+
+                                            <!-- Download Trigger -->
+                                            <a href="{{ url_for('cloud.download', file_id=file.id) }}" class="btn btn-outline-custom btn-sm py-1 px-2" title="Download File">
+                                                <i class="bi bi-download text-success"></i>
+                                            </a>
+
+                                            <!-- Modify Trigger -->
+                                            <button type="button" class="btn btn-outline-custom btn-sm py-1 px-2 btn-modify-file"
+                                                    data-file-id="{{ file.id }}"
+                                                    data-file-name="{{ file.filename }}"
+                                                    title="Replace / Modify Content">
+                                                <i class="bi bi-pencil text-warning"></i>
+                                            </button>
+
+                                            <!-- Delete Trigger -->
+                                            <button type="button" class="btn btn-outline-custom btn-sm py-1 px-2 text-danger btn-delete-file"
+                                                    data-file-id="{{ file.id }}"
+                                                    data-file-name="{{ file.filename }}"
+                                                    title="Permanently Delete">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Grid View Mode (Initially Hidden) -->
+                <div id="files-grid-container" class="p-4 d-none">
+                    <div class="row g-3" id="files-grid-row">
+                        {% for file in files %}
+                            {% set ext = file.filename.split('.')[-1].lower() if '.' in file.filename else '' %}
+                            <div class="col-sm-6 col-lg-4 file-grid-item" data-filename="{{ file.filename | lower }}" data-ext="{{ ext }}">
+                                <div class="file-grid-card">
+                                    <div>
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div class="p-2 rounded bg-light border">
+                                                {% if ext in ['pdf'] %}
+                                                    <i class="bi bi-file-earmark-pdf-fill fs-3 text-danger"></i>
+                                                {% elif ext in ['csv', 'xlsx', 'xls'] %}
+                                                    <i class="bi bi-file-earmark-spreadsheet-fill fs-3 text-success"></i>
+                                                {% elif ext in ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'] %}
+                                                    <i class="bi bi-file-earmark-image-fill fs-3 text-primary"></i>
+                                                {% elif ext in ['py', 'js', 'json', 'sol', 'html', 'css', 'sql'] %}
+                                                    <i class="bi bi-file-earmark-code-fill fs-3 text-warning"></i>
+                                                {% else %}
+                                                    <i class="bi bi-file-earmark-fill fs-3 text-primary"></i>
+                                                {% endif %}
+                                            </div>
+                                            <span class="badge bg-light border text-secondary font-mono">{{ file.formatted_size }}</span>
+                                        </div>
+                                        <h3 class="h6 fw-bold text-dark text-truncate mb-1" title="{{ file.filename }}">{{ file.filename }}</h3>
+                                        <div class="text-muted small font-mono mb-3" style="font-size: 0.72rem;">
+                                            {{ file.upload_date.strftime('%Y-%m-%d %H:%M UTC') if file.upload_date else 'N/A' }}
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center pt-2 border-top border-light-subtle">
+                                        <button type="button" class="btn btn-outline-custom btn-sm py-1 px-2 btn-inspect-file"
+                                                data-file-id="{{ file.id }}"
+                                                data-file-name="{{ file.filename }}"
+                                                data-file-size="{{ file.formatted_size }} ({{ file.filesize }} bytes)"
+                                                data-file-owner="{{ file.owner_id }}"
+                                                data-file-upload="{{ file.upload_date.strftime('%Y-%m-%d %H:%M:%S UTC') if file.upload_date else 'N/A' }}"
+                                                data-file-modified="{{ file.last_modified.strftime('%Y-%m-%d %H:%M:%S UTC') if file.last_modified else 'N/A' }}">
+                                            <i class="bi bi-info-circle text-primary"></i> Details
+                                        </button>
+                                        <div class="d-flex gap-1">
+                                            <a href="{{ url_for('cloud.download', file_id=file.id) }}" class="btn btn-outline-custom btn-sm py-1 px-2" title="Download">
+                                                <i class="bi bi-download text-success"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-outline-custom btn-sm py-1 px-2 text-danger btn-delete-file"
+                                                    data-file-id="{{ file.id }}"
+                                                    data-file-name="{{ file.filename }}"
+                                                    title="Delete">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-cloud-slash fs-1 d-block mb-2 text-secondary"></i>
+                    <h3 class="h5 fw-bold text-dark mb-2">No Cloud Files Found</h3>
+                    <p class="small text-secondary mb-4">Your storage space is currently empty. Upload a file to test automatic audit logging and SHA-256 anchoring.</p>
+                    <button type="button" class="btn btn-primary-custom btn-sm" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <i class="bi bi-upload me-1"></i> Upload Your First File
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal with Drag & Drop Ingestion -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-content-custom">
+            <div class="modal-header modal-header-custom">
+                <h5 class="modal-title fw-semibold text-dark d-flex align-items-center gap-2" id="uploadModalLabel">
+                    <i class="bi bi-cloud-arrow-up-fill text-primary"></i>
+                    <span>Upload Cloud Asset</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('cloud.upload') }}" enctype="multipart/form-data" id="upload-form" onsubmit="handleFormSubmitLoading(this, 'Uploading & Anchoring...');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="dropzone-container mb-3" id="dropzone-upload">
+                        <i class="bi bi-cloud-arrow-up dropzone-icon"></i>
+                        <div class="fw-semibold text-dark mb-1">Click to browse or drag file here</div>
+                        <div class="small text-muted mb-2">Maximum file size: 16 MB. All extensions permitted.</div>
+                        <div id="selected-file-info" class="badge bg-light border text-primary small mt-2 d-none"></div>
+                    </div>
+                    <input class="d-none" type="file" id="upload-file-input" name="file" required>
+                    <div class="p-3 rounded bg-light border text-secondary small mb-0">
+                        <i class="bi bi-shield-lock text-primary me-1"></i> File is stored in isolated workspace storage; SHA-256 digest is generated and anchored automatically to Ganache.
+                    </div>
+                </div>
+                <div class="modal-footer modal-footer-custom">
+                    <button type="button" class="btn btn-outline-custom btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-custom btn-sm" id="btn-submit-upload">
+                        <i class="bi bi-upload me-1"></i> Upload & Anchor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modify Content Modal -->
+<div class="modal fade" id="modifyModal" tabindex="-1" aria-labelledby="modifyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-content-custom">
+            <div class="modal-header modal-header-custom">
+                <h5 class="modal-title fw-semibold text-dark d-flex align-items-center gap-2" id="modifyModalLabel">
+                    <i class="bi bi-pencil-square text-warning"></i>
+                    <span>Modify File Content</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="" enctype="multipart/form-data" id="modify-form" onsubmit="handleFormSubmitLoading(this, 'Saving Changes...');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <p class="small text-secondary mb-3">
+                        Replacing physical content for: <strong class="text-dark font-mono" id="modify-file-name-display"></strong>
+                    </p>
+                    <div class="mb-3">
+                        <label for="modify-file-input" class="form-label text-secondary small fw-semibold">Select Replacement File</label>
+                        <input class="form-control form-control-custom" type="file" id="modify-file-input" name="file" required>
+                        <div class="form-text text-muted small mt-1">Physical content is updated and an immutable <code>MODIFY</code> audit record will be anchored.</div>
+                    </div>
+                </div>
+                <div class="modal-footer modal-footer-custom">
+                    <button type="button" class="btn btn-outline-custom btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-custom btn-sm" id="btn-submit-modify">
+                        <i class="bi bi-check2-circle me-1"></i> Save Changes & Log
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-content-custom">
+            <div class="modal-header modal-header-custom">
+                <h5 class="modal-title fw-semibold text-danger d-flex align-items-center gap-2" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>Confirm File Deletion</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="" id="delete-form" onsubmit="handleFormSubmitLoading(this, 'Deleting & Logging...');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <p class="small text-secondary mb-2">
+                        Are you sure you want to permanently delete:
+                    </p>
+                    <div class="p-2 mb-3 rounded bg-light border font-mono text-dark text-center" id="delete-file-name-display"></div>
+                    <div class="alert alert-warning border small mb-0">
+                        <i class="bi bi-shield-exclamation me-1"></i> Physical file will be deleted from disk, but the immutable audit trail preserves a permanent <code>DELETE</code> event record.
+                    </div>
+                </div>
+                <div class="modal-footer modal-footer-custom">
+                    <button type="button" class="btn btn-outline-custom btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-outline-danger btn-sm" id="btn-submit-delete">
+                        <i class="bi bi-trash3-fill me-1"></i> Confirm Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- File Details Inspection Modal -->
+<div class="modal fade" id="inspectFileModal" tabindex="-1" aria-labelledby="inspectFileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content modal-content-custom">
+            <div class="modal-header modal-header-custom">
+                <h5 class="modal-title fw-semibold text-dark d-flex align-items-center gap-2" id="inspectFileModalLabel">
+                    <i class="bi bi-info-circle text-primary"></i>
+                    <span>File Metadata Inspection</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 font-mono small">
+                <div class="mb-3">
+                    <span class="text-muted d-block font-sans small mb-1">Target Filename:</span>
+                    <span class="text-dark fw-semibold" id="inspect-filename"></span>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <span class="text-muted d-block font-sans small">Size:</span>
+                        <span class="text-dark fw-semibold" id="inspect-size"></span>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted d-block font-sans small">Owner:</span>
+                        <span class="text-dark fw-semibold" id="inspect-owner"></span>
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <span class="text-muted d-block font-sans small">Uploaded At:</span>
+                        <span class="text-secondary" id="inspect-upload"></span>
+                    </div>
+                    <div class="col-6">
+                        <span class="text-muted d-block font-sans small">Last Modified:</span>
+                        <span class="text-secondary" id="inspect-modified"></span>
+                    </div>
+                </div>
+                <div class="p-3 rounded bg-light border text-secondary font-sans small mb-0">
+                    <i class="bi bi-link-45deg text-primary me-1"></i> File activity corresponds to immutable SHA-256 event logs anchored to the Ganache smart contract.
+                </div>
+            </div>
+            <div class="modal-footer modal-footer-custom">
+                <button type="button" class="btn btn-outline-custom btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Dynamic Client Filter
+    const searchInput = document.getElementById('file-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.toLowerCase().trim();
+            document.querySelectorAll('.file-row').forEach(row => {
+                const name = row.getAttribute('data-filename') || '';
+                row.style.display = name.includes(query) ? '' : 'none';
+            });
+            document.querySelectorAll('.file-grid-item').forEach(card => {
+                const name = card.getAttribute('data-filename') || '';
+                card.style.display = name.includes(query) ? '' : 'none';
+            });
+        });
+    }
+
+    // 2. View Mode Toggle (Table vs Grid)
+    const btnTable = document.getElementById('btn-view-table');
+    const btnGrid = document.getElementById('btn-view-grid');
+    const tableContainer = document.getElementById('files-table-container');
+    const gridContainer = document.getElementById('files-grid-container');
+
+    if (btnTable && btnGrid && tableContainer && gridContainer) {
+        btnTable.addEventListener('click', () => {
+            btnTable.classList.add('active');
+            btnGrid.classList.remove('active');
+            tableContainer.classList.remove('d-none');
+            gridContainer.classList.add('d-none');
+        });
+
+        btnGrid.addEventListener('click', () => {
+            btnGrid.classList.add('active');
+            btnTable.classList.remove('active');
+            tableContainer.classList.add('d-none');
+            gridContainer.classList.remove('d-none');
+        });
+    }
+
+    // 3. Setup File Drag & Drop Ingestion
+    setupDropzone('dropzone-upload', 'upload-file-input', 'selected-file-info');
+
+    // 4. Modal Triggers: Modify & Delete Context Population
+    document.querySelectorAll('.btn-modify-file').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const fileId = btn.getAttribute('data-file-id');
+            const fileName = btn.getAttribute('data-file-name');
+            const form = document.getElementById('modify-form');
+            const display = document.getElementById('modify-file-name-display');
+            if (form && display) {
+                form.action = `/cloud/files/${fileId}/modify`;
+                display.textContent = fileName;
+                const modal = new bootstrap.Modal(document.getElementById('modifyModal'));
+                modal.show();
+            }
+        });
+    });
+
+    document.querySelectorAll('.btn-delete-file').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const fileId = btn.getAttribute('data-file-id');
+            const fileName = btn.getAttribute('data-file-name');
+            const form = document.getElementById('delete-form');
+            const display = document.getElementById('delete-file-name-display');
+            if (form && display) {
+                form.action = `/cloud/files/${fileId}/delete`;
+                display.textContent = fileName;
+                const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+                modal.show();
+            }
+        });
+    });
+
+    // 5. Inspect File Modal Population
+    document.querySelectorAll('.btn-inspect-file').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('inspect-filename').textContent = btn.getAttribute('data-file-name');
+            document.getElementById('inspect-size').textContent = btn.getAttribute('data-file-size');
+            document.getElementById('inspect-owner').textContent = 'User #' + btn.getAttribute('data-file-owner');
+            document.getElementById('inspect-upload').textContent = btn.getAttribute('data-file-upload');
+            document.getElementById('inspect-modified').textContent = btn.getAttribute('data-file-modified');
+            const modal = new bootstrap.Modal(document.getElementById('inspectFileModal'));
+            modal.show();
+        });
+    });
+});
+</script>
+{% endblock %}
